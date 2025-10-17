@@ -58,18 +58,47 @@ app.get('/fetchReviews/dealer/:id', async (req, res) => {
 
 // Express route to fetch all dealerships
 app.get('/fetchDealers', async (req, res) => {
-//Write your code here
-});
+    try {
+      const documents = await Dealerships.find();
+      res.json(documents);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Error fetching dealerships' });
+    }
+  });
 
 // Express route to fetch Dealers by a particular state
 app.get('/fetchDealers/:state', async (req, res) => {
-//Write your code here
-});
+    try {
+      // case-insensitive match on state - exact string match or partial if you prefer
+      const stateParam = req.params.state;
+      // If you want exact match:
+      // const documents = await Dealerships.find({ state: stateParam });
+      // Allow case-insensitive matching:
+      const documents = await Dealerships.find({ state: { $regex: `^${stateParam}$`, $options: 'i' }});
+      res.json(documents);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Error fetching dealerships by state' });
+    }
+  });
 
 // Express route to fetch dealer by a particular id
 app.get('/fetchDealer/:id', async (req, res) => {
-//Write your code here
-});
+    try {
+      // assuming your dealer document uses "id" field similar to reviews
+      const dealerId = parseInt(req.params.id, 10);
+      if (Number.isNaN(dealerId)) {
+        return res.status(400).json({ error: 'Invalid dealer id' });
+      }
+      const document = await Dealerships.findOne({ id: dealerId });
+      if (!document) return res.status(404).json({ error: 'Dealer not found' });
+      res.json(document);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Error fetching dealer by id' });
+    }
+  });
 
 //Express route to insert review
 app.post('/insert_review', express.raw({ type: '*/*' }), async (req, res) => {
