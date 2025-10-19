@@ -101,17 +101,25 @@ def get_dealerships(request, state="All"):
     return JsonResponse({"status":200,"dealers":dealerships})
 
 def get_dealer_reviews(request, dealer_id):
-    # if dealer id has been provided
-    if(dealer_id):
-        endpoint = "/fetchReviews/dealer/"+str(dealer_id)
-        reviews = get_request(endpoint)
-        for review_detail in reviews:
-            response = analyze_review_sentiments(review_detail['review'])
-            print(response)
-            review_detail['sentiment'] = response['sentiment']
-        return JsonResponse({"status":200,"reviews":reviews})
-    else:
-        return JsonResponse({"status":400,"message":"Bad Request"})
+    if not dealer_id:
+        return JsonResponse({"status": 400, "message": "Bad Request"})
+
+    endpoint = f"/fetchReviews/dealer/{dealer_id}"
+    reviews = get_request(endpoint)
+
+    if not reviews or not isinstance(reviews, list):
+        return JsonResponse({"status": 200, "reviews": []})  # return empty list instead of 500
+
+    for review_detail in reviews:
+        review_text = review_detail.get('review', '')
+        try:
+            response = analyze_review_sentiments(str(review_text))
+            review_detail['sentiment'] = (response or {}).get('sentiment', 'unknown')
+        except Exception as e:
+            print(f"Error analyzing review: {e}")
+            review_detail['sentiment'] = 'unknown'
+
+    return JsonResponse({"status": 200, "reviews": reviews})
 
 def get_dealer_details(request, dealer_id):
     if(dealer_id):
@@ -121,13 +129,20 @@ def get_dealer_details(request, dealer_id):
     else:
         return JsonResponse({"status":400,"message":"Bad Request"})
 
-def add_review(request):
-    if(request.user.is_anonymous == False):
-        data = json.loads(request.body)
+def add_review(request, dealer_id=None):   # optional dealer_id if in URL
+    # If user visits via GET (e.g. directly in browser)
+    if request.method == "GET":
+        return JsonResponse({"message": "Please use POST method to add a review."})
+
+    # Only allow logged-in users to post reviews
+    if not request.user.is_anonymous:
         try:
+            data = json.loads(request.body)
             response = post_review(data)
-            return JsonResponse({"status":200})
-        except:
-            return JsonResponse({"status":401,"message":"Error in posting review"})
+            return JsonResponse({"status": 200, "message": "Review posted successfully"})
+        except Exception as e:
+            print("Error posting review:", e)
+            return JsonResponse({"status": 401, "message": "Error in posting review"})
     else:
-        return JsonResponse({"status":403,"message":"Unauthorized"})
+        return JsonResponse({"status": 403, "message": "Unauthorized"})
+
